@@ -1,0 +1,59 @@
+{
+  "name": "treasury-yields-rates-today-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Treasury yields and rates today: the US Treasury par yield curve with the 10-year and 2-year yield, spreads and inversion, yield history, T-bill rates and TIPS real yields with breakeven inflation. No API key.",
+  "type": "module",
+  "license": "MIT",
+  "author": "theluckystrike",
+  "mcpName": "io.github.theluckystrike/treasury-yields-rates-today-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theluckystrike/treasury-yields-rates-today-mcp"
+  },
+  "homepage": "https://www.mcpstamp.com/servers/",
+  "bin": {
+    "treasury-yields-rates-today-mcp": "dist/stdio.js"
+  },
+  "main": "dist/stdio.js",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test",
+    "start": "node dist/stdio.js",
+    "deploy": "npx wrangler@4 deploy",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "claude",
+    "treasury",
+    "treasury-yields",
+    "treasury-rates",
+    "yield-curve",
+    "10-year-treasury",
+    "t-bill-rates",
+    "tips",
+    "breakeven-inflation",
+    "interest-rates",
+    "bonds",
+    "us-treasury",
+    "cloudflare-workers"
+  ]
+}

@@ -1,0 +1,76 @@
+// Cloudflare Worker entry: stateless Streamable HTTP at /mcp, no auth, no KV, no Durable Objects.
+// Any upstream answers are cached at the edge with fetch's cf.cacheTtl so repeat calls do not reach the upstream site.
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { createServer, TOOL_INFO, VERSION, META } from './tools.js';
+import { fetchWithRetry } from './fetch-node.js';
+import { SITE, UTM, REPO } from './core.js';
+import type { FetchText } from './types.js';
+import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
+
+/**
+ * Measured 2026-11-14 on the estate's hosted endpoint: Claude sends tool calls with
+ * mcp-protocol-version 2026-07-28, newer than this SDK knows, and the SDK answers 400.
+ * A well-formed date newer than the SDK's latest is served as the latest; malformed or
+ * older values are left for the SDK to reject.
+ */
+function normalizeProtocolVersion(request: Request): Request {
+  const v = request.headers.get('mcp-protocol-version')?.trim();
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v) || v <= LATEST_PROTOCOL_VERSION) return request;
+  const headers = new Headers(request.headers);
+  headers.set('mcp-protocol-version', LATEST_PROTOCOL_VERSION);
+  return new Request(request, { headers });
+}
+
+const fetchTextEdge: FetchText = (url, opts = {}) =>
+  fetchWithRetry(url, opts, { cf: { cacheTtl: Math.max(60, opts.cacheTtl ?? 300), cacheEverything: true } } as RequestInit);
+
+const CORS: Record<string, string> = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Accept, Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID',
+  'Access-Control-Expose-Headers': 'Mcp-Session-Id, Mcp-Protocol-Version',
+};
+
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+
+function home(origin: string): Response {
+  const url = `${origin}/mcp`;
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${REPO}</title><meta name="description" content="${esc(META.metaDescription)}">
+<style>body{font:16px/1.55 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#1d2731;background:#fff}code,pre{background:#f1f4f7;border-radius:4px}pre{padding:.7rem;overflow-x:auto}code{padding:0 .25rem}td{padding:.3rem .5rem;vertical-align:top;border-bottom:1px solid #e3e8ee}a{color:#0b5cad}</style></head><body>
+<h1>${REPO}</h1>
+<p>${esc(META.intro)} No key, no sign-up. Version ${VERSION}.</p>
+<h2>Tools</h2><table>${TOOL_INFO.map((t) => `<tr><td><code>${t.name}</code></td><td>${esc(t.blurb)}</td></tr>`).join('')}</table>
+<h2>Connect</h2>
+<p>Hosted endpoint (Streamable HTTP, no token, no sign-up). Paste it into a Claude.ai custom connector or ChatGPT developer mode:</p>
+<pre>${url}</pre>
+<p>Claude Code:</p><pre>claude mcp add --transport http ${META.alias} ${url}</pre>
+<p>Local stdio (after the npm release, Node 20+):</p><pre>npx -y ${REPO}</pre>
+<p>Source and install notes for Cursor and VS Code: <a href="https://github.com/theluckystrike/${REPO}">github.com/theluckystrike/${REPO}</a></p>
+<p>More MCP servers that answer questions your assistant cannot answer alone are on <a href="${SITE}/servers/?${UTM}">mcpstamp.com</a>.</p>
+<p>Part of the Zovo MCP collection: <a href="https://mcp.zovo.one">https://mcp.zovo.one</a></p>
+</body></html>`;
+  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=3600' } });
+}
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    if (url.pathname === '/' && request.method === 'GET') return home(url.origin);
+    if (url.pathname === '/health') return Response.json({ ok: true, name: REPO, version: VERSION });
+    if (url.pathname !== '/mcp' && url.pathname !== '/mcp/') return new Response('Not found. The MCP endpoint is /mcp', { status: 404 });
+    if (request.method !== 'POST') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed. This stateless server accepts POST only.' }, id: null }), {
+        status: 405, headers: { 'content-type': 'application/json', Allow: 'POST, OPTIONS', ...CORS },
+      });
+    }
+    const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+    const server = createServer(fetchTextEdge);
+    await server.connect(transport);
+    const res = await transport.handleRequest(normalizeProtocolVersion(request));
+    const headers = new Headers(res.headers);
+    for (const [k, v] of Object.entries(CORS)) headers.set(k, v);
+    return new Response(res.body, { status: res.status, headers });
+  },
+};

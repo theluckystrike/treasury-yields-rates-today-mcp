@@ -1,0 +1,6 @@
+[
+  ["treasury_yield_curve", {}],
+  ["treasury_yield_history", {"tenor": "10y"}],
+  ["treasury_bill_rates", {}],
+  ["treasury_real_yields", {}]
+]

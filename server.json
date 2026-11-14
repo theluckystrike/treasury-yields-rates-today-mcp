@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.theluckystrike/treasury-yields-rates-today-mcp",
+  "title": "Treasury Yields and Rates Today MCP",
+  "description": "US Treasury yields and rates today: yield curve, 10-year, spreads, T-bill rates, TIPS real yields.",
+  "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/theluckystrike/treasury-yields-rates-today-mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://treasury-yields-rates-today-mcp.lipmichal.workers.dev/mcp"
+    }
+  ]
+}
