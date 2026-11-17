@@ -21,8 +21,10 @@ function normalizeProtocolVersion(request: Request): Request {
   return new Request(request, { headers });
 }
 
-const fetchTextEdge: FetchText = (url, opts = {}) =>
-  fetchWithRetry(url, opts, { cf: { cacheTtl: Math.max(60, opts.cacheTtl ?? 300), cacheEverything: true } } as RequestInit);
+// Only 2xx answers are cached at the edge. A plain cf.cacheTtl cached every status, so one upstream 403 or 5xx was
+// served to every caller until the TTL ran out (measured 2026-11-17: cf-cache-status HIT on a data.cms.gov 403).
+export const fetchTextEdge: FetchText = (url, opts = {}) =>
+  fetchWithRetry(url, opts, { cf: { cacheEverything: true, cacheTtlByStatus: { '200-299': Math.max(60, opts.cacheTtl ?? 300), '300-599': 0 } } } as RequestInit);
 
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
